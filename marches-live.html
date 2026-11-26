@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Marchés en direct</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+/* VOICE: graphics desk of a financial daily, calm and exact
+   IDEA: the market page of a newspaper, but ticking
+   PICTURE: big intraday chart of the selected asset, live last point
+   COLOUR and TYPE: pale pink ground, ink, teal up, claret down; Libre Franklin
+   LAYOUT: headline price + chart on top, two quote tables below, settings last */
+:root{color-scheme:light dark;--bg:light-dark(#ffe3dc,#1c1512);--card:light-dark(#fff1ec,#261d19);--ink:light-dark(#1a1817,#f3e9e4);--mut:light-dark(#6b5f5a,#a8978f);--line:light-dark(#e8c9bf,#3a2d27);--up:light-dark(#0d7680,#3fb6bf);--dn:light-dark(#990f3d,#ff6b8f)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 "Libre Franklin",system-ui,sans-serif;overflow-x:clip}
+.band{padding:clamp(20px,3vw,44px) max(5vw,16px);max-width:1240px;margin:0 auto}
+header{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:baseline;justify-content:space-between}
+h1{font-size:clamp(28px,4vw,44px);line-height:1.05;margin:0;font-weight:800;text-wrap:balance}
+h2{font-size:22px;margin:0 0 10px;font-weight:800}
+.st{display:flex;flex-wrap:wrap;gap:8px 16px;font-size:14px;color:var(--mut)}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--mut);margin-right:6px;vertical-align:1px}
+.dot.on{background:var(--up)}.dot.off{background:var(--dn)}
+.hero{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;margin-top:20px}
+.big{display:flex;flex-wrap:wrap;gap:6px 20px;align-items:baseline}
+.big .nm{font-size:22px;font-weight:800}
+.big .px{font-size:clamp(36px,6vw,56px);font-weight:800;line-height:1;font-variant-numeric:tabular-nums;white-space:nowrap}
+.big .ch{font-size:20px;font-weight:600;white-space:nowrap}
+.fig{position:relative;min-height:320px}.fig>svg{position:absolute;inset:0;width:100%;height:100%}
+.up{color:var(--up)}.dn{color:var(--dn)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,520px),1fr));gap:28px}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+th{font-size:13px;font-weight:600;color:var(--mut);text-align:right;padding:6px 8px;border-bottom:2px solid var(--ink)}
+th:first-child,td:first-child{text-align:left}
+td{padding:8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+tbody tr{cursor:pointer}tbody tr:hover,tbody tr.sel{background:var(--card)}
+td.a b{display:block}td.a small{color:var(--mut);font-size:13px}
+td svg{width:110px;height:30px;display:block;margin-left:auto}
+.x{background:none;border:0;color:var(--mut);font-size:18px;cursor:pointer;width:32px;height:32px;border-radius:6px}
+.x:hover,.x:focus-visible{color:var(--dn);outline:2px solid var(--line)}
+.flash-up{animation:fu .8s}.flash-dn{animation:fd .8s}
+@keyframes fu{from{background:color-mix(in srgb,var(--up) 25%,transparent)}}
+@keyframes fd{from{background:color-mix(in srgb,var(--dn) 25%,transparent)}}
+@media(prefers-reduced-motion:reduce){.flash-up,.flash-dn{animation:none}}
+form{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+input{font:inherit;font-size:16px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);flex:1 1 160px;min-height:44px}
+button.b{font:inherit;font-weight:600;padding:10px 16px;min-height:44px;border-radius:8px;border:0;background:var(--ink);color:var(--bg);cursor:pointer}
+input:focus-visible,button:focus-visible,tr:focus-visible{outline:3px solid var(--up);outline-offset:2px}
+.note{font-size:14px;color:var(--mut);margin:8px 0 0}
+.empty{padding:16px 8px;color:var(--mut);font-size:15px}
+@media(max-width:600px){.hide-s{display:none}td svg{width:70px}td,th{padding:6px 4px}}
+</style>
+</head>
+<body>
+<div class="band">
+  <header>
+    <h1>Marchés en direct</h1>
+    <div class="st">
+      <span><span class="dot" id="dC"></span>Crypto <span id="sC">connexion…</span></span>
+      <span><span class="dot" id="dS"></span>Actions <span id="sS">clé requise</span></span>
+      <span id="clk"></span>
+    </div>
+  </header>
+
+  <section class="hero" aria-live="polite">
+    <div class="big"><span class="nm" id="hN">—</span><span class="px" id="hP">—</span><span class="ch" id="hC"></span></div>
+    <div class="fig"><svg id="chart" role="img" aria-label="Graphique du cours sélectionné"></svg></div>
+    <p class="note" id="hNote"></p>
+  </section>
+</div>
+
+<div class="band grid">
+  <section>
+    <h2>Actions <small style="font-weight:400;color:var(--mut);font-size:14px">Finnhub, variation vs clôture veille</small></h2>
+    <table><thead><tr><th>Titre</th><th>Prix</th><th>Var. jour</th><th class="hide-s">Clôt. veille</th><th>Séance</th><th></th></tr></thead><tbody id="tS"></tbody></table>
+    <form id="fS"><input id="iS" placeholder="Ajouter un ticker (ex. AMD, NFLX)" autocomplete="off" aria-label="Ticker action"><button class="b">Ajouter</button></form>
+    <form id="fK"><input id="iK" type="password" placeholder="Clé API Finnhub (gratuite)" autocomplete="off" aria-label="Clé API Finnhub"><button class="b">Enregistrer</button></form>
+    <p class="note">Clé gratuite sur <a href="https://finnhub.io/register" style="color:inherit">finnhub.io/register</a>. Elle reste dans votre navigateur. L'offre gratuite couvre surtout les actions US ; hors séance (15 h 30 – 22 h, heure de Paris), le dernier cours affiché est la clôture.</p>
+  </section>
+  <section>
+    <h2>Crypto <small style="font-weight:400;color:var(--mut);font-size:14px">Coinbase, en dollars, 24 h glissantes</small></h2>
+    <table><thead><tr><th>Actif</th><th>Prix</th><th>Var. 24 h</th><th class="hide-s">Vol. 24 h</th><th>24 h</th><th></th></tr></thead><tbody id="tC"></tbody></table>
+    <form id="fC"><input id="iC" placeholder="Ajouter une paire (ex. LINK-USD, BTC-EUR)" autocomplete="off" aria-label="Paire crypto"><button class="b">Ajouter</button></form>
+  </section>
+</div>
+
+<script>
+{
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
+const store={get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+const clean=s=>s.toUpperCase().replace(/\s/g,'').match(/^[A-Z0-9.:\-]{1,20}$/)?.[0];
+
+let cList=store.get('mk2.c',['CRO-USD','ETH-USD','BTC-USD','XRP-USD','BAT-USD','SOL-USD','ADA-USD','DOGE-USD']);
+let sList=store.get('mk2.s',['ANT','NVDA','MSFT','AAPL','GOOGL','AMZN','META','TSLA']);
+let key=store.get('mk.k','');
+let sel=store.get('mk3.sel',{t:'s',s:'ANT'});
+const D={}; // key "c:BTCUSDT" -> {price, chg, vol, ref, spark:[], prev}
+
+const fmtP=p=>{if(p==null||isNaN(p))return '—';const d=p>=1000?2:p>=1?(p>=100?2:4):6;return p.toLocaleString('fr-FR',{minimumFractionDigits:d,maximumFractionDigits:d})};
+const fmtPct=v=>v==null||isNaN(v)?'':(v>=0?'+':'')+v.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+' %';
+const fmtV=v=>v==null?'—':Intl.NumberFormat('fr-FR',{notation:'compact',maximumFractionDigits:1}).format(v);
+const cls=v=>v>=0?'up':'dn';
+const base=s=>s.split('-')[0];
+const NAMES={CRO:'Cronos',ETH:'Ethereum',BTC:'Bitcoin',XRP:'XRP',BAT:'Basic Attention Token',SOL:'Solana',ADA:'Cardano',DOGE:'Dogecoin',ANT:'Anthropic',NVDA:'Nvidia',MSFT:'Microsoft',AAPL:'Apple',GOOGL:'Alphabet',AMZN:'Amazon',META:'Meta',TSLA:'Tesla'};
+
+function spark(a){
+  if(!a||a.length<2)return '<svg></svg>';
+  const mn=Math.min(...a),mx=Math.max(...a),r=mx-mn||1;
+  const pts=a.map((v,i)=>(i/(a.length-1)*100).toFixed(2)+','+(28-(v-mn)/r*26).toFixed(2)).join(' ');
+  const c=a[a.length-1]>=a[0]?'var(--up)':'var(--dn)';
+  return `<svg viewBox="0 0 100 30" preserveAspectRatio="none"><polyline points="${pts}" fill="none" stroke="${c}" stroke-width="1.6" vector-effect="non-scaling-stroke"/></svg>`;
+}
+
+function rows(t,list,tb){
+  if(t==='s'&&!key){tb.innerHTML='<tr><td colspan="6" class="empty">Saisissez une clé Finnhub ci-dessous pour afficher les actions.</td></tr>';return}
+  if(!list.length){tb.innerHTML='<tr><td colspan="6" class="empty">Aucun actif. Ajoutez-en un ci-dessous.</td></tr>';return}
+  tb.innerHTML=list.map(s=>{const k=t+':'+s,e=esc(s);
+    return `<tr id="r-${esc(k)}" data-k="${esc(k)}" tabindex="0" class="${sel.t===t&&sel.s===s?'sel':''}">
+    <td class="a"><b>${esc(t==='c'?base(s):s)}</b><small>${esc(NAMES[t==='c'?base(s):s]||s)}</small></td><td class="p">—</td><td class="g"></td><td class="v hide-s">—</td><td class="sp"></td>
+    <td><button class="x" data-del="${esc(k)}" aria-label="Retirer ${e}">×</button></td></tr>`}).join('');
+  list.forEach(s=>paint(t+':'+s));
+}
+
+const dirty=new Set();let raf=0;
+function mark(k){dirty.add(k);if(!raf)raf=requestAnimationFrame(()=>{raf=0;dirty.forEach(paint);dirty.clear();})}
+function paint(k){
+  const d=D[k],r=document.getElementById('r-'+k);
+  if(d&&r){
+    const p=r.querySelector('.p'),g=r.querySelector('.g');
+    if(d.prev!=null&&d.price!==d.prev){r.classList.remove('flash-up','flash-dn');void r.offsetWidth;r.classList.add(d.price>d.prev?'flash-up':'flash-dn')}
+    d.prev=d.price;
+    p.textContent=fmtP(d.price);g.textContent=fmtPct(d.chg);g.className='g '+cls(d.chg);
+    r.querySelector('.v').textContent=k[0]==='c'?fmtV(d.vol):fmtP(d.ref);
+    r.querySelector('.sp').innerHTML=spark(d.spark);
+  }
+  if(k===sel.t+':'+sel.s)hero();
+}
+
+function hero(){
+  const k=sel.t+':'+sel.s,d=D[k];
+  $('hN').textContent=(NAMES[sel.t==='c'?base(sel.s):sel.s]||sel.s)+' · '+sel.s;
+  $('hP').textContent=d?fmtP(d.price):'—';
+  $('hC').textContent=d?fmtPct(d.chg):'';$('hC').className='ch '+(d?cls(d.chg):'');
+  $('hNote').textContent=sel.t==='c'?'Clôtures toutes les 15 minutes sur 24 h, dernier point en direct.':'Transactions reçues depuis l\'ouverture de cette page (ligne pointillée : clôture de la veille).';
+  draw();
+}
+
+const svg=$('chart');
+function draw(){
+  const W=svg.clientWidth,H=svg.clientHeight,d=D[sel.t+':'+sel.s];
+  if(!W||!d||!d.spark||d.spark.length<2){svg.innerHTML=`<text x="${W/2}" y="${H/2}" text-anchor="middle" fill="var(--mut)" font-size="15">En attente de données…</text>`;return}
+  const a=d.spark,ref=sel.t==='s'?d.ref:null,all=ref?a.concat(ref):a;
+  const mn=Math.min(...all),mx=Math.max(...all),pad=(mx-mn)*0.08||1;
+  const L=W<520?8:12,R=W<520?70:90,T=16,B=24;
+  const x=i=>L+i/(a.length-1)*(W-L-R),y=v=>T+(1-(v-mn+pad)/(mx-mn+2*pad))*(H-T-B);
+  const c=a[a.length-1]>=a[0]?'var(--up)':'var(--dn)';
+  const line=a.map((v,i)=>`${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
+  let s=`<defs><linearGradient id="gf" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${c}" stop-opacity=".22"/><stop offset="1" stop-color="${c}" stop-opacity="0"/></linearGradient></defs>`;
+  [mx,(mx+mn)/2,mn].forEach(v=>{s+=`<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${W-R+8}" y="${y(v)+4}" fill="var(--mut)" font-size="12">${fmtP(v)}</text>`});
+  if(ref)s+=`<line x1="${L}" x2="${W-R}" y1="${y(ref)}" y2="${y(ref)}" stroke="var(--mut)" stroke-dasharray="4 4"/>`;
+  s+=`<polygon points="${x(0)},${H-B} ${line} ${x(a.length-1)},${H-B}" fill="url(#gf)"/><polyline points="${line}" fill="none" stroke="${c}" stroke-width="2.2" stroke-linejoin="round"/>`;
+  const lx=x(a.length-1),ly=y(a[a.length-1]);
+  s+=`<circle cx="${lx}" cy="${ly}" r="5" fill="${c}"/><circle cx="${lx}" cy="${ly}" r="10" fill="${c}" opacity=".2"/>`;
+  if(sel.t==='c'&&W>=520)s+=`<text x="${L}" y="${H-6}" fill="var(--mut)" font-size="12">il y a 24 h</text><text x="${W-R}" y="${H-6}" fill="var(--mut)" font-size="12" text-anchor="end">maintenant</text>`;
+  svg.innerHTML=s;
+}
+const ro=new ResizeObserver(draw);ro.observe(svg);
+
+/* ---------- Crypto : Coinbase Exchange ---------- */
+const CB='https://api.exchange.coinbase.com/products/';
+let wsC,cRetry=0,cTimer;
+function setC(st,txt){$('dC').className='dot '+st;$('sC').textContent=txt}
+async function candles(s){try{
+  const r=await fetch(CB+encodeURIComponent(s)+'/candles?granularity=900');if(!r.ok)return;
+  const k='c:'+s;D[k]=D[k]||{spark:[]};D[k].spark=(await r.json()).slice(0,96).reverse().map(c=>+c[4]);mark(k);
+}catch(e){}}
+async function loadCrypto(){
+  for(const s of cList){try{
+    const r=await fetch(CB+encodeURIComponent(s)+'/stats');
+    if(!r.ok){const row=document.getElementById('r-c:'+s);if(row)row.querySelector('.p').textContent='indisponible';continue}
+    const t=await r.json(),k='c:'+s,d=D[k]=D[k]||{spark:[]};
+    d.price=+t.last;d.chg=(t.last-t.open)/t.open*100;d.vol=t.volume*t.last;mark(k);
+  }catch(e){setC('off','API injoignable')}
+  candles(s);}
+}
+function connectCrypto(){
+  clearTimeout(cTimer);if(wsC){wsC.onclose=null;wsC.close()}
+  if(!cList.length){setC('','aucun actif');return}
+  wsC=new WebSocket('wss://ws-feed.exchange.coinbase.com');
+  wsC.onopen=()=>{cRetry=0;setC('on','en direct');wsC.send(JSON.stringify({type:'subscribe',product_ids:cList,channels:['ticker']}))};
+  wsC.onmessage=e=>{const m=JSON.parse(e.data);if(m.type!=='ticker')return;const k='c:'+m.product_id,d=D[k]=D[k]||{spark:[]};
+    d.price=+m.price;d.chg=(m.price-m.open_24h)/m.open_24h*100;d.vol=m.volume_24h*m.price;if(d.spark.length)d.spark[d.spark.length-1]=d.price;mark(k)};
+  wsC.onclose=()=>{setC('off','reconnexion…');cTimer=setTimeout(connectCrypto,Math.min(30000,1000*2**cRetry++))};
+}
+setInterval(()=>cList.forEach(candles),15*60*1000);
+
+/* ---------- Actions : Finnhub ---------- */
+let wsS,sRetry=0,sTimer;
+function setS(st,txt){$('dS').className='dot '+st;$('sS').textContent=txt}
+async function loadStocks(){
+  if(!key)return;
+  for(const s of sList){try{
+    const r=await fetch(`https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(s)}&token=${encodeURIComponent(key)}`);
+    if(r.status===401||r.status===403){setS('off','clé refusée');return}
+    const q=await r.json();if(!q||!q.c)continue;const k='s:'+s,d=D[k]=D[k]||{spark:[]};
+    d.price=q.c;d.ref=q.pc;d.chg=q.pc?(q.c-q.pc)/q.pc*100:q.dp;if(!d.spark.length)d.spark=[q.pc,q.c];mark(k);
+  }catch(e){}}
+}
+function connectStocks(){
+  clearTimeout(sTimer);if(wsS){wsS.onclose=null;wsS.close()}
+  if(!key){setS('','clé requise');return}
+  wsS=new WebSocket('wss://ws.finnhub.io?token='+encodeURIComponent(key));
+  wsS.onopen=()=>{sRetry=0;setS('on',marketOpen()?'en direct':'marché US fermé');sList.forEach(s=>wsS.send(JSON.stringify({type:'subscribe',symbol:s})))};
+  wsS.onmessage=e=>{const m=JSON.parse(e.data);if(m.type!=='trade')return;
+    m.data.forEach(t=>{const k='s:'+t.s,d=D[k]=D[k]||{spark:[]};d.price=t.p;if(d.ref)d.chg=(t.p-d.ref)/d.ref*100;
+      const sp=d.spark;if(sp.length>600)sp.splice(1,1);sp.push(t.p);mark(k)})};
+  wsS.onclose=()=>{setS('off','reconnexion…');sTimer=setTimeout(connectStocks,Math.min(60000,2000*2**sRetry++))};
+}
+function marketOpen(){const n=new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'}));const m=n.getHours()*60+n.getMinutes(),d=n.getDay();return d>0&&d<6&&m>=570&&m<960}
+setInterval(loadStocks,60000);
+
+/* ---------- UI ---------- */
+function renderAll(){rows('c',cList,$('tC'));rows('s',sList,$('tS'));hero()}
+function select(k){const[t,...r]=k.split(':');sel={t,s:r.join(':')};store.set('mk3.sel',sel);
+  document.querySelectorAll('tbody tr.sel').forEach(x=>x.classList.remove('sel'));document.getElementById('r-'+k)?.classList.add('sel');hero()}
+document.addEventListener('click',e=>{
+  const del=e.target.closest('[data-del]');
+  if(del){const[t,...r]=del.dataset.del.split(':'),s=r.join(':');
+    if(t==='c'){cList=cList.filter(x=>x!==s);store.set('mk2.c',cList);connectCrypto()}else{sList=sList.filter(x=>x!==s);store.set('mk2.s',sList);wsS?.readyState===1&&wsS.send(JSON.stringify({type:'unsubscribe',symbol:s}))}
+    delete D[del.dataset.del];renderAll();return}
+  const tr=e.target.closest('tbody tr[data-k]');if(tr)select(tr.dataset.k);
+});
+document.addEventListener('keydown',e=>{const tr=e.target.closest?.('tbody tr[data-k]');if(tr&&(e.key==='Enter'||e.key===' ')){e.preventDefault();select(tr.dataset.k)}});
+$('fC').addEventListener('submit',e=>{e.preventDefault();const s=clean($('iC').value);if(!s||!s.includes('-')||cList.includes(s))return;
+  cList.push(s);store.set('mk2.c',cList);$('iC').value='';renderAll();loadCrypto();connectCrypto()});
+$('fS').addEventListener('submit',e=>{e.preventDefault();const s=clean($('iS').value);if(!s||sList.includes(s))return;
+  sList.push(s);store.set('mk2.s',sList);$('iS').value='';renderAll();loadStocks();wsS?.readyState===1&&wsS.send(JSON.stringify({type:'subscribe',symbol:s}))});
+$('fK').addEventListener('submit',e=>{e.preventDefault();key=$('iK').value.trim();store.set('mk.k',key);$('iK').value='';renderAll();loadStocks();connectStocks()});
+if(key)$('iK').placeholder='Clé enregistrée — saisir pour remplacer';
+setInterval(()=>{$('clk').textContent=new Date().toLocaleTimeString('fr-FR')},1000);
+
+renderAll();loadCrypto();connectCrypto();loadStocks();connectStocks();
+}
+</script>
+</body>
+</html>
